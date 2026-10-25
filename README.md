@@ -207,3 +207,5 @@ Model server endpoints (all except `/health` require the `X-API-Key` header):
 ## Security
 
 Never commit `backend/.env`, `firebase-service-account.json`, `model_server/.env` or `model_server/.api_key`. They are listed in `.gitignore`. The model server is public through the tunnel, so every model call requires the API key.
+#   a u t o m i n d - a i  
+ 
