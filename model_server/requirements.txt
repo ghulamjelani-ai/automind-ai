@@ -1,0 +1,25 @@
+# GPU model server (runs on Google Colab or any CUDA machine).
+# torch is not listed: Colab already has a CUDA build. Elsewhere install it first from
+# https://pytorch.org/get-started/locally/
+
+# Server
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-dotenv>=1.0
+pydantic>=2.6
+
+# Mistral 7B
+transformers>=5.0
+accelerate>=1.0
+bitsandbytes>=0.43.3
+sentencepiece>=0.2
+protobuf>=4.25
+
+# Stable Diffusion 1.5
+diffusers>=0.42
+safetensors>=0.4
+pillow>=10.0
+
+# LoRA adapters (loading and training)
+peft>=0.21
+datasets>=2.19

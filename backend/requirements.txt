@@ -1,0 +1,15 @@
+﻿fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+python-multipart
+
+# Database
+sqlalchemy
+psycopg[binary]
+
+# Firebase
+firebase-admin
+
+# HTTP: the GPU model server (Mistral 7B + Stable Diffusion 1.5) and the Facebook Graph API
+requests

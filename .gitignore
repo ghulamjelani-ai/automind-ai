@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Model server secrets
+model_server/.env
+model_server/.api_key
+
+# Training outputs and generated or private data
+training/output/
+training/data/train.jsonl
+training/data/eval.jsonl
+training/data/db_export.jsonl
+training/data/brand_images/*
+!training/data/brand_images/README.md

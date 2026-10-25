@@ -1,0 +1,209 @@
+from datetime import datetime
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.core import model_server
+from app.core.ai_client import generate_marketing_ai_reply
+from app.db.database import get_db
+from app.models.models import Conversation, Message, User
+from app.routers.auth import get_current_db_user
+from app.routers.memory import get_memory_text, update_memory_in_background
+from app.schemas.chat import ChatRequest, ChatResponse, ChatHistoryResponse
+
+router = APIRouter()
+
+
+@router.get("/test")
+def test_chat_model():
+    reply = generate_marketing_ai_reply(
+        user_message="Weekend offer: buy 2 cupcakes, get 1 free.",
+        business_name="Test Bakery",
+        industry="Bakery",
+    )
+
+    return {
+        "success": True,
+        "model": model_server.health().get("text_model"),
+        "reply": reply,
+    }
+
+
+@router.post("/plan", response_model=ChatResponse)
+def generate_marketing_plan(
+    data: ChatRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_db_user),
+):
+    if data.conversation_id:
+        conversation = (
+            db.query(Conversation)
+            .filter(
+                Conversation.id == data.conversation_id,
+                Conversation.user_id == user.id,
+            )
+            .first()
+        )
+
+        if not conversation:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation not found"
+            )
+    else:
+        conversation = None
+
+    # Earlier messages give the model context for follow-up questions.
+    previous_messages = (
+        db.query(Message)
+        .filter(Message.conversation_id == conversation.id)
+        .order_by(Message.created_at.asc())
+        .all()
+        if conversation
+        else []
+    )
+
+    history = [
+        {
+            "role": "assistant" if message.role == "ai" else "user",
+            "content": message.content,
+        }
+        for message in previous_messages
+    ][-12:]
+
+    sent_at = datetime.utcnow()
+
+    # Nothing is saved until the model answers, so a failed request
+    # never leaves an empty conversation or an unanswered message.
+    reply = generate_marketing_ai_reply(
+        user_message=data.message,
+        business_name=data.business_name or "My Business",
+        industry=data.industry,
+        history=history,
+        memory=get_memory_text(db, user.id),
+    )
+
+    if conversation is None:
+        conversation = Conversation(
+            user_id=user.id,
+            title=data.message[:60] if data.message else "New Marketing Chat",
+        )
+
+        db.add(conversation)
+        db.flush()
+
+    db.add_all([
+        Message(
+            conversation_id=conversation.id,
+            role="user",
+            content=data.message,
+            created_at=sent_at,
+        ),
+        Message(
+            conversation_id=conversation.id,
+            role="ai",
+            content=reply,
+        ),
+    ])
+    db.commit()
+    db.refresh(conversation)
+
+    # Remember lasting business facts from this message (runs after the reply is sent).
+    background_tasks.add_task(update_memory_in_background, user.id, data.message)
+
+    return ChatResponse(
+        reply=reply,
+        conversation_id=str(conversation.id),
+    )
+
+
+@router.get(
+    "/history/{conversation_id}",
+    response_model=ChatHistoryResponse
+)
+def get_chat_history(
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_db_user),
+):
+    conversation = (
+        db.query(Conversation)
+        .filter(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user.id,
+        )
+        .first()
+    )
+
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found"
+        )
+
+    return ChatHistoryResponse(
+        conversation_id=str(conversation.id),
+        title=conversation.title,
+        messages=[
+            {
+                "role": message.role,
+                "content": message.content,
+            }
+            for message in conversation.messages
+        ],
+    )
+
+
+@router.get("/conversations")
+def get_conversations(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_db_user),
+):
+    conversations = (
+        db.query(Conversation)
+        .filter(Conversation.user_id == user.id)
+        .order_by(Conversation.updated_at.desc())
+        .all()
+    )
+
+    return {
+        "success": True,
+        "conversations": [
+            {
+                "id": str(conversation.id),
+                "title": conversation.title,
+                "created_at": conversation.created_at.isoformat(),
+                "updated_at": conversation.updated_at.isoformat(),
+            }
+            for conversation in conversations
+        ],
+    }
+
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_db_user),
+):
+    conversation = (
+        db.query(Conversation)
+        .filter(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user.id,
+        )
+        .first()
+    )
+
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found"
+        )
+
+    db.delete(conversation)
+    db.commit()
+
+    return {"success": True}
+

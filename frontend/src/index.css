@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  --color-beige: #F5E8D0;
+  --color-beigeDark: #E2CFA8;
+  --color-mehroon: #7B1E2B;
+  --color-mehroonDark: #3B151B;
+  --color-goldSoft: #D6B98C;
+
+  --font-classic: Georgia, serif;
+  --font-modern: Inter, system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f5e8d0;
+  color: #3b151b;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.auth-bg {
+  background:
+    radial-gradient(circle at top left, rgba(123, 30, 43, 0.18), transparent 35%),
+    linear-gradient(135deg, #f5e8d0 0%, #e2cfa8 100%);
+}
+
+.classic-card {
+  background: rgba(255, 248, 235, 0.86);
+  border: 1px solid rgba(123, 30, 43, 0.15);
+  box-shadow: 0 25px 60px rgba(59, 21, 27, 0.12);
+  backdrop-filter: blur(14px);
+}
